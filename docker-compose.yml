@@ -1,0 +1,12 @@
+services:
+  db:
+    image: gvenzl/oracle-xe:21-slim
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:?Set ORACLE_PASSWORD before starting Oracle XE}
+    ports:
+      - "1521:1521"
+    volumes:
+      - ./db:/container-entrypoint-initdb.d
+      - oracledata:/opt/oracle/oradata
+volumes:
+  oracledata: {}

@@ -1,0 +1,51 @@
+:root {
+  --rk-bg: #f7f7f7;
+  --rk-surface: #ffffff;
+  --rk-primary: #123b6b;
+  --rk-text: #1b1b1b;
+  --rk-border: #dfe5ec;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: var(--rk-bg);
+  color: var(--rk-text);
+}
+
+.rk-header {
+  background: var(--rk-primary);
+  color: white;
+  padding: 1rem 1.5rem;
+}
+
+.rk-auth-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 420px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: var(--rk-surface);
+  border: 1px solid var(--rk-border);
+  border-radius: 12px;
+}
+
+.rk-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.rk-input {
+  padding: 0.75rem;
+  border: 1px solid var(--rk-border);
+  border-radius: 8px;
+}
+
+.rk-btn {
+  padding: 0.8rem 1rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--rk-primary);
+  color: white;
+  cursor: pointer;
+}
