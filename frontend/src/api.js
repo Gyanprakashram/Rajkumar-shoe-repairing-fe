@@ -119,7 +119,7 @@ export function markActivity(){
 
 export function isSessionIdle(){
   const last=Number(sessionStorage.getItem('rk_last_activity')||0);
-  return !last||Date.now()-last>=IDLE_TIMEOUT_MS;
+  return !last||Date.now()-last>IDLE_TIMEOUT_MS;
 }
 
 export async function refreshSession(){
