@@ -1,5 +1,5 @@
 # Raj Kumar Shoe Repairing – Full-stack app
-React (Vite) + Spring Boot 3 (Java 21) + Oracle Database XE. Role-based login (USER / ADMIN) uses 15-minute access JWTs with rotating refresh tokens. Sessions end after five minutes without activity; active users remain signed in while refreshing tokens.
+React (Vite) + Spring Boot 3 (Java 21). Local development uses Oracle Database XE; the Render UAT profile supports Neon PostgreSQL. Role-based login (USER / ADMIN) uses 15-minute access JWTs with rotating refresh tokens. Sessions end after five minutes without activity; active users remain signed in while refreshing tokens.
 
 ## Run
 1. Database: install/start Oracle Database Free with service `FREEPDB1` on port `1521`. To use Docker instead, set `ORACLE_PASSWORD` and `ORACLE_JDBC_URL=jdbc:oracle:thin:@//localhost:1521/XEPDB1`, then run `docker compose up -d db` (runs db/01_schema.sql + db/02_seed.sql on first start).
@@ -21,6 +21,24 @@ Owners can attach a JPG, PNG, or WebP product photo (up to 5 MB) while adding a 
 Products can be assigned to the storefront's material sections and marked out of stock by setting the stock count to zero. The materials page has category, min/max price, stock-availability, and sort controls.
 
 Override `ORACLE_JDBC_URL` if your Oracle listener uses a different host, port, or service name. Do not commit database credentials.
+
+### Render backend with Neon
+
+The backend Dockerfile activates the `uat` profile. UAT database settings are in `backend/src/main/resources/application.properties`. Because Spring JDBC requires a JDBC URL, configure Neon connection details as separate Render environment variables rather than pasting the raw `postgresql://` URL:
+
+Set these additional Render environment variables:
+
+- `NEON_HOST`: the hostname from the Neon connection string (use the pooled hostname)
+- `NEON_DATABASE`: the database name from the Neon connection string
+- `NEON_USERNAME` and `NEON_PASSWORD`: the Neon credentials; rotate any password that has been shared
+- `NEON_PORT`: `5432` (optional; this is the default)
+- `JWT_SECRET`: a newly generated, private signing secret
+- `ADMIN_PHONE` and `ADMIN_PASSWORD`: the owner account credentials
+- `FRONTEND_URL` and `CORS_ORIGIN`: the deployed frontend origin (for example, `https://your-frontend.onrender.com`)
+
+SMTP settings are optional; configure `SMTP_USERNAME`, `SMTP_PASSWORD`, and optionally `SMTP_FROM` to enable email. The Neon database should be empty for a fresh deployment; Hibernate creates the application tables, and the app initializes the owner account and settings. Existing Oracle records are not copied. Keep all credentials in Render's environment settings, not in source control.
+
+The frontend selects the backend automatically: `npm run dev` uses `http://localhost:8080/api`, while production builds use `https://rajkumarshoerepairing.onrender.com/api`. To target another backend, set the optional `VITE_API` environment variable to its API base URL (including `/api`) before starting Vite or building. Once deployed, `GET /api/products` is a public readiness check.
 
 Backend defaults and environment overrides are centralized in `backend/src/main/resources/application.properties`. Access JWTs expire after 15 minutes (`JWT_EXPIRATION_MS=900000`) and sessions expire after five idle minutes (`SESSION_IDLE_TIMEOUT_MS=300000`). Refresh tokens rotate on use and are stored as hashes in the database. Set `JWT_SECRET` to a private, strong signing key. Frontend-only build settings such as `VITE_API` and `VITE_SHOP_MAPS_URL` belong in `frontend/.env`, because Vite reads them at build time.
 

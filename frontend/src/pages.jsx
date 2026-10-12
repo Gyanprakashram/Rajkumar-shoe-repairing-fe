@@ -1,6 +1,7 @@
 import {useState,useEffect,useRef} from 'react';
 
 import {api,clearSession,isSessionIdle} from './api';
+import {API_BASE} from './apiConfig';
 import {DEFAULT_OTP_LENGTH,OTP_REQUIRED} from './utils/constants';
 
 const SV={REPAIR:[["Polish & clean",80],["Stitching",150],["Sticking / glue",200],["Sole replacement",350],["Leather jacket polish",450],["Leather belt (made to order)",250]],
@@ -21,7 +22,6 @@ const fillCurrentLocation=(onLocated,toast)=>{
 
 const SHOP_MAPS_URL=import.meta.env.VITE_SHOP_MAPS_URL||'https://www.google.com/maps/search/?api=1&query=Raj+Kumar+Shoe+Repairing+Bistupur+Jamshedpur';
 const SHOP_MAP_EMBED='https://maps.google.com/maps?q=Raj%20Kumar%20Shoe%20Repairing%2C%20Bistupur%2C%20Jamshedpur&output=embed';
-const API_BASE=import.meta.env.VITE_API||'http://localhost:8080/api';
 const productImageUrl=product=>product.imageUrl?new URL(product.imageUrl,`${API_BASE}/`).href:null;
 
 function storedUser(){
