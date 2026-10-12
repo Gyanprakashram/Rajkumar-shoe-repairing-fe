@@ -1,4 +1,5 @@
-const B=import.meta.env.VITE_API||'http://localhost:8080/api';
+import {API_BASE} from './apiConfig';
+const B=API_BASE;
 const IDLE_TIMEOUT_MS=5*60*1000;
 const ENCRYPTION_ENABLED=import.meta.env.VITE_API_ENCRYPTION_ENABLED==='true';
 const ENCRYPTION_KEY=import.meta.env.VITE_API_ENCRYPTION_KEY||'';
@@ -119,7 +120,7 @@ export function markActivity(){
 
 export function isSessionIdle(){
   const last=Number(sessionStorage.getItem('rk_last_activity')||0);
-  return !last||Date.now()-last>=IDLE_TIMEOUT_MS;
+  return !last||Date.now()-last>IDLE_TIMEOUT_MS;
 }
 
 export async function refreshSession(){

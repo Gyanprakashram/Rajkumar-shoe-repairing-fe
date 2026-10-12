@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API || 'http://localhost:8080/api';
+import { API_BASE } from '../apiConfig';
 
 export async function apiClient(path, method = 'GET', body) {
   const httpOptions = {

@@ -1,5 +1,5 @@
 # Raj Kumar Shoe Repairing – Full-stack app
-React (Vite) + Spring Boot 3 (Java 21) + Oracle Database XE. Role-based login (USER / ADMIN) uses 15-minute access JWTs with rotating refresh tokens. Sessions end after five minutes without activity; active users remain signed in while refreshing tokens.
+React (Vite) + Spring Boot 3 (Java 21). Local development uses Oracle Database XE; the Render UAT profile supports Neon PostgreSQL. Role-based login (USER / ADMIN) uses 15-minute access JWTs with rotating refresh tokens. Sessions end after five minutes without activity; active users remain signed in while refreshing tokens.
 
 ## Run
 1. Database: install/start Oracle Database Free with service `FREEPDB1` on port `1521`. To use Docker instead, set `ORACLE_PASSWORD` and `ORACLE_JDBC_URL=jdbc:oracle:thin:@//localhost:1521/XEPDB1`, then run `docker compose up -d db` (runs db/01_schema.sql + db/02_seed.sql on first start).
@@ -22,6 +22,24 @@ Products can be assigned to the storefront's material sections and marked out of
 
 Override `ORACLE_JDBC_URL` if your Oracle listener uses a different host, port, or service name. Do not commit database credentials.
 
+### Render backend with Neon
+
+The backend Dockerfile activates the `uat` profile. UAT database settings are in `backend/src/main/resources/application.properties`. Because Spring JDBC requires a JDBC URL, configure Neon connection details as separate Render environment variables rather than pasting the raw `postgresql://` URL:
+
+Set these additional Render environment variables:
+
+- `NEON_HOST`: the hostname from the Neon connection string (use the pooled hostname)
+- `NEON_DATABASE`: the database name from the Neon connection string
+- `NEON_USERNAME` and `NEON_PASSWORD`: the Neon credentials; rotate any password that has been shared
+- `NEON_PORT`: `5432` (optional; this is the default)
+- `JWT_SECRET`: a newly generated, private signing secret
+- `ADMIN_PHONE` and `ADMIN_PASSWORD`: the owner account credentials
+- `FRONTEND_URL` and `CORS_ORIGIN`: the deployed frontend origin (for example, `https://your-frontend.onrender.com`)
+
+SMTP settings are optional; configure `SMTP_USERNAME`, `SMTP_PASSWORD`, and optionally `SMTP_FROM` to enable email. The Neon database should be empty for a fresh deployment; Hibernate creates the application tables, and the app initializes the owner account and settings. Existing Oracle records are not copied. Keep all credentials in Render's environment settings, not in source control.
+
+The frontend selects the backend automatically: `npm run dev` uses `http://localhost:8080/api`, while production builds use `https://rajkumarshoerepairing.onrender.com/api`. To target another backend, set the optional `VITE_API` environment variable to its API base URL (including `/api`) before starting Vite or building. Once deployed, `GET /api/products` is a public readiness check.
+
 Backend defaults and environment overrides are centralized in `backend/src/main/resources/application.properties`. Access JWTs expire after 15 minutes (`JWT_EXPIRATION_MS=900000`) and sessions expire after five idle minutes (`SESSION_IDLE_TIMEOUT_MS=300000`). Refresh tokens rotate on use and are stored as hashes in the database. Set `JWT_SECRET` to a private, strong signing key. Frontend-only build settings such as `VITE_API` and `VITE_SHOP_MAPS_URL` belong in `frontend/.env`, because Vite reads them at build time.
 
 ### Optional encrypted API JSON payloads
@@ -42,11 +60,12 @@ Owner login (auto-created): phone `9263627052`, password `admin123` unless `ADMI
 
 ## Google Pay, email, and WhatsApp
 
-### Google Pay / UPI
-1. In the owner dashboard, open **Payment settings**, enter the shop's UPI ID (for example, `shopname@okaxis`) and payee name, then save.
-2. Customers must provide a delivery, drop-off, or showroom address when placing any order. They choose **Pay now** to get a Google Pay button and scannable UPI QR for material orders, or choose **Pay on delivery**. No card gateway or payment keys are used.
-3. After paying, the customer submits the UPI reference (UTR). The order stays **AWAITING_VERIFICATION** until the owner checks the payment in their bank/UPI app and approves it. A UPI QR/deep link cannot independently confirm that money arrived.
-4. Repair, custom, and showroom bulk requests do not collect payment at submission. The owner enters a quote; the customer receives an in-app notification and, when configured, email and WhatsApp message with the amount. The customer accepts or declines in **My orders**. Accepted work is confirmed and due on delivery.
+### Razorpay checkout / UPI
+Set `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in the backend environment before starting Spring Boot. Use Razorpay test credentials for local testing, then configure live credentials and the receiving bank account in the Razorpay dashboard for production. Keep the secret on the backend; never put it in a Vite environment variable or source control. The existing `app.razorpay.key-id` and `app.razorpay.key-secret` properties read those environment variables.
+
+Customers can pay through the secure Razorpay checkout using available methods such as UPI/Google Pay and cards, or choose pay on delivery. The backend creates the Razorpay order, checks the checkout signature and payment amount against the gateway, captures an authorized payment, and only then confirms the order. The checkout expires after ten minutes; abandoned or failed orders are cancelled and reserved inventory is returned. If a payment is captured after expiry, the backend requests a refund and marks it for owner follow-up. Razorpay credentials are unavailable by default, so online checkout is disabled until both backend variables are configured.
+
+Repair, custom, and showroom bulk requests do not collect payment at submission. The owner enters a quote; the customer receives an in-app notification and, when configured, email and WhatsApp message with the amount. The customer accepts or declines in **My orders**. Accepted work is confirmed and due on delivery.
 
 ### Email (SMTP)
 The SMTP defaults in `backend/src/main/resources/application.properties` use Gmail (`smtp.gmail.com`, port `587`) and the shop's configured sender address. Customer order-received and owner booking emails use a branded HTML layout, with booking details in the owner notification. Customer approval messages are sent through the configured email and SMS channels. External notification delivery runs asynchronously after booking transactions commit, so SMTP or messaging delays do not hold up order submission. SMTP connection/read/write timeouts default to 5 seconds each and can be changed with `SMTP_CONNECTION_TIMEOUT_MS`, `SMTP_READ_TIMEOUT_MS`, and `SMTP_WRITE_TIMEOUT_MS`. Email notifications are enabled when a valid Gmail App Password is supplied as `SMTP_PASSWORD`; no password is stored in source. If it is unset or invalid, mail delivery will fail and be logged.
@@ -101,14 +120,16 @@ Customers can follow the full order journey in **My orders** and **Repair → Tr
 
 Feedback is saved separately in Oracle's `customer_feedback` table, one review per delivered order. Customers can submit a 1–5 star rating and written review only for their own delivered orders. The submitted review content is available only to admins through **Admin → Ratings & reviews**. Set `FRONTEND_URL` to the deployed frontend origin before enabling customer email links in production; it defaults to `http://localhost:5173` for local development.
 
-Required fields are validated in both the browser and backend: account name/phone/password, order address, showroom footwear type/quantity/location, product name/category/prices/stock, quote amount, payment reference, and order status. Email is optional but must be valid if supplied.
+Required fields are validated in both the browser and backend: account name/phone/password, delivery address and recipient phone, showroom footwear type/quantity/location, product name/category/prices/stock/variants, quote amount, payment confirmation, and order status. Email is optional but must be valid if supplied.
 
 ## Flow
-1. The customer books a repair, custom item, or materials and chooses **Pay now** (full amount via Google Pay/UPI) or **Pay on delivery** (no advance).
-2. For online UPI, the owner confirms the submitted UTR against the actual bank transaction before approving. The server does not mark self-reported payments as paid.
-3. Repair requests can include up to three JPG, PNG, or WebP photos; showroom bulk requests and custom orders can include up to five (5 MB each). Repair/bulk photos are stored as Base64 CLOBs in Oracle and attached to the owner's order email when SMTP is configured. Custom reference photos remain BLOBs. The owner can view uploaded images in the admin order list.
-4. Showroom bulk requests include footwear type, estimated pair quantity, showroom/pickup location, repair details, and photos. The bulk page links to a Bistupur, Jamshedpur Google Maps search; set `VITE_SHOP_MAPS_URL` in the frontend environment to the verified Google Business Profile to direct visitors to the exact listing and its authentic reviews.
-5. New customers receive a welcome notification on the contact channels they provide. The owner sees customer contact details and uploaded photos on each booking, then quotes or declines requests and updates accepted order statuses. Quote emails include a direct WhatsApp chat link to the shop.
+1. Customers can search product names, categories and variant values (including partial prefixes/suffixes); search results expose on-demand filters for category, brand/company, size, price and stock. All matching materials render in the scrollable catalog.
+2. Owners can define any combination of variant attributes (for example, brand and size for soles, colour for thread, or brand/colour/volume for polish), with price, MRP and stock tracked per combination. Customers choose an available combination and quantity before adding it to their cart.
+3. The account area lets customers edit their profile and saved delivery address, review orders, and open their cart. Checkout pre-fills the saved address and keeps delivery contact details separate from the sign-in phone. The optional location button uses browser permission to place GPS coordinates in the editable landmark field; no reverse-geocoding service is called.
+4. Material orders can use verified Razorpay checkout or pay on delivery. The server only confirms an online order after it verifies the gateway payment; a self-reported UPI reference alone is not treated as proof of payment.
+5. Repair requests can include up to three JPG, PNG, or WebP photos; showroom bulk requests and custom orders can include up to five (5 MB each). Repair/bulk photos are stored as Base64 CLOBs in Oracle and attached to the owner's order email when SMTP is configured. Custom reference photos remain BLOBs. The owner can view uploaded images in the admin order list.
+6. The owner dashboard filters orders by order ID/product/customer, type, amount, payment/order status and date (today, last 30 days or all time), and filters products by name, category and availability. Showroom bulk requests include footwear type, estimated pair quantity, showroom/pickup location, repair details and photos. The bulk page links to a Bistupur, Jamshedpur Google Maps search; set `VITE_SHOP_MAPS_URL` in the frontend environment to the verified Google Business Profile.
+7. New customers receive a welcome notification on the contact channels they provide. The owner sees customer contact details and uploaded photos on each booking, then quotes or declines requests and updates accepted order statuses. Quote emails include a direct WhatsApp chat link to the shop.
 ## API (all under /api)
 auth: POST /auth/register, /auth/login · public: GET /products, /settings/public
 customer: multipart POST /orders, GET /orders, POST /orders/{id}/payment (material UTR), POST /orders/{id}/quote-response, GET /feedback/status/{orderId}, POST /feedback/{orderId}, GET /notifications, POST /notifications/read
