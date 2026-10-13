@@ -36,7 +36,7 @@ Set these additional Render environment variables:
 - `ADMIN_PHONE` and `ADMIN_PASSWORD`: the owner account credentials
 - `FRONTEND_URL` and `CORS_ORIGIN`: the deployed frontend origin (for example, `https://your-frontend.onrender.com`)
 
-SMTP settings are optional; configure `SMTP_USERNAME`, `SMTP_PASSWORD`, and optionally `SMTP_FROM` to enable email. The Neon database should be empty for a fresh deployment; Hibernate creates the application tables, and the app initializes the owner account and settings. Existing Oracle records are not copied. Keep all credentials in Render's environment settings, not in source control.
+SMTP settings are optional; configure `SMTP_USERNAME`, `SMTP_PASSWORD`, and optionally `SMTP_FROM` to enable email. The Neon database should be empty for a fresh deployment; Hibernate creates the application tables, and the app initializes the owner account and settings. `ADMIN_PHONE` and `ADMIN_PASSWORD` are read by the UAT profile when creating the owner account. If an owner already exists for that phone, startup preserves its existing password; use that password or the password-reset flow rather than expecting an environment-variable change to overwrite it. Existing Oracle records are not copied. Keep all credentials in Render's environment settings, not in source control.
 
 The frontend selects the backend automatically: `npm run dev` uses `http://localhost:8080/api`, while production builds use `https://rajkumarshoerepairing.onrender.com/api`. To target another backend, set the optional `VITE_API` environment variable to its API base URL (including `/api`) before starting Vite or building. Once deployed, `GET /api/products` is a public readiness check.
 
